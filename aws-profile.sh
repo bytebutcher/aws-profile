@@ -8,7 +8,6 @@
 #   bytebutcher
 # ##################################################
 
-APP_PATH="$(dirname "$(readlink -f "$0")")"
 VERSION="1.0.0"
 
 function usage() {
@@ -104,7 +103,6 @@ while [ "$1" != "" ]; do
 		version )
 			echo "AWS Profile"
 			echo "Version: ${VERSION}"
-			echo "Commit hash: $(cd ${APP_PATH} && git rev-parse HEAD)"
 			exit 0
 			;;
 		* )
