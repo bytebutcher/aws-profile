@@ -8,6 +8,8 @@
 #   bytebutcher
 # ##################################################
 
+VERSION="1.0"
+
 function usage() {
 	echo "AWS Profile allows to add and switch between multiple"	>&2
 	echo "user profiles." 											>&2
@@ -96,6 +98,12 @@ while [ "$1" != "" ]; do
 			;;
 		help )
  			usage
+			exit 0
+			;;
+		version )
+			echo "AWS Profile"
+			echo "Version: 1.0.0"
+			echo "Commit hash: $(git rev-parse HEAD)"
 			exit 0
 			;;
 		* )
