@@ -8,7 +8,8 @@
 #   bytebutcher
 # ##################################################
 
-VERSION="1.0"
+APP_PATH="$(dirname "$(readlink -f "$0")")"
+VERSION="1.0.0"
 
 function usage() {
 	echo "AWS Profile allows to add and switch between multiple"	>&2
@@ -102,8 +103,8 @@ while [ "$1" != "" ]; do
 			;;
 		version )
 			echo "AWS Profile"
-			echo "Version: 1.0.0"
-			echo "Commit hash: $(git rev-parse HEAD)"
+			echo "Version: ${VERSION}"
+			echo "Commit hash: $(cd ${APP_PATH} && git rev-parse HEAD)"
 			exit 0
 			;;
 		* )
