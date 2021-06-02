@@ -1,0 +1,42 @@
+#!/bin/bash
+if ! [ -d ~/.aws-profile/ ] ; then
+	git clone https://github.com/bytebutcher/aws-profile ~/.aws-profile/
+fi
+
+if ! [ -f ~/.aws-profile/aws-profile.sh ] ; then
+	echo "ERROR: Installation of aws-profile failed!" >&2
+	exit 1
+fi
+
+cat <<EOF > ~/.aws-profile.bash
+unalias aws-profile 2> /dev/null
+aws-profile() {
+	case "\${1}" in
+		use )
+			if aws-profile.sh \$@ > /dev/null; then
+				export AWS_PROFILE="\${2}"
+			fi
+			;;
+		* )
+			aws-profile.sh \$@
+			;;
+	esac
+}
+export -f aws-profile > /dev/null
+export PATH=~/.aws-profile/:\${PATH}
+EOF
+
+if ! [ -f ~/.aws-profile.bash ] ; then
+	echo "ERROR: Installation of aws-profile failed!" >&2
+	exit 1
+fi
+
+result="$(grep "[ -f ~/.aws-profile.bash ] && source ~/.aws-profile.bash" ~/.bashrc)"
+if [ -z "${result}" ]  ; then
+	echo "[ -f ~/.aws-profile.bash ] && source ~/.aws-profile.bash" >> ~/.bashrc
+fi
+
+echo "Finished. Restart your shell or reload config file."
+[[ "$shells" =~ bash ]] && echo "   source ~/.bashrc  # bash"
+#[[ "$shells" =~ zsh ]]  && echo "   source ${ZDOTDIR:-~}/.zshrc   # zsh"
+#[[ "$shells" =~ fish ]] && [ $key_bindings -eq 1 ] && echo "   fzf_key_bindings  # fish"
