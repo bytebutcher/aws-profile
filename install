@@ -31,8 +31,7 @@ if ! [ -f ~/.aws-profile.bash ] ; then
 	exit 1
 fi
 
-result="$(grep "[ -f ~/.aws-profile.bash ] && source ~/.aws-profile.bash" ~/.bashrc)"
-if [ -z "${result}" ]  ; then
+if ! grep "\[ -f ~/.aws-profile.bash \] && source ~/.aws-profile.bash" ~/.bashrc > /dev/null; then 
 	echo "[ -f ~/.aws-profile.bash ] && source ~/.aws-profile.bash" >> ~/.bashrc
 fi
 
