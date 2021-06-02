@@ -14,8 +14,12 @@ aws-profile() {
 	case "\${1}" in
 		use )
 			if aws-profile.sh \$@ > /dev/null; then
-				export AWS_PROFILE="\${2}"
+				echo "export AWS_PROFILE=\"\${2}\"" > ~/.aws-profile/current
+				source ~/.aws-profile/current &> /dev/null
 			fi
+			;;
+		reload )
+			source ~/.aws-profile/current &> /dev/null
 			;;
 		* )
 			aws-profile.sh \$@
@@ -24,6 +28,7 @@ aws-profile() {
 }
 export -f aws-profile > /dev/null
 export PATH=~/.aws-profile/:\${PATH}
+source ~/.aws-profile/current &> /dev/null
 EOF
 
 if ! [ -f ~/.aws-profile.bash ] ; then

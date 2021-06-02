@@ -11,20 +11,21 @@
 VERSION="1.0.0"
 
 function usage() {
-	echo "AWS Profile allows to add and switch between multiple"	>&2
-	echo "user profiles." 											>&2
-	echo ""															>&2
-	echo "Usage:"													>&2
-	echo "  aws-profile [command]"									>&2
-	echo ""															>&2
-	echo "Available Commands:"										>&2
-	echo "  add      Add an entry to a profile"						>&2
-	echo "  help     Shows this help"								>&2
-	echo "  ls       List of profiles"								>&2 
-	echo "  status   Show information about the current profile"	>&2
-	echo "  use      Use a profile"									>&2
-	echo "  version  Print version number of AWS Profile"			>&2
-	echo ""															>&2
+	echo "AWS Profile allows to add and switch between multiple"    >&2
+	echo "user profiles."                                           >&2
+	echo ""                                                         >&2
+	echo "Usage:"                                                   >&2
+	echo "  aws-profile [command]"                                  >&2
+	echo ""                                                         >&2
+	echo "Available Commands:"                                      >&2
+	echo "  add      Add an entry to a profile"                     >&2
+	echo "  help     Shows this help"                               >&2
+	echo "  ls       List profiles"                                 >&2 
+	echo "  reload   Reload profile"                                >&2
+	echo "  status   Show information about the current profile"    >&2
+	echo "  use      Use a profile"                                 >&2
+	echo "  version  Print version number of AWS Profile"           >&2
+	echo ""                                                         >&2
 	exit 1
 }
 
@@ -90,6 +91,10 @@ while [ "$1" != "" ]; do
 				exit 1
 			fi
 			echo "export AWS_PROFILE=${profile}"
+			exit 0
+			;;
+		reload )
+			# This function is implemented in ~/.aws-profile.bash
 			exit 0
 			;;
 		status )
