@@ -19,7 +19,7 @@ Available Commands:
   help     Shows this help
   ls       List of profiles
   reload   Reload profile
-  status   Show information about the current profile
+  current  Show information about the current profile
   use      Use a profile
   version  Print version number of AWS Profile
 

@@ -22,7 +22,7 @@ function usage() {
 	echo "  help     Shows this help"                               >&2
 	echo "  ls       List profiles"                                 >&2 
 	echo "  reload   Reload profile"                                >&2
-	echo "  status   Show information about the current profile"    >&2
+	echo "  current  Show information about the current profile"    >&2
 	echo "  use      Use a profile"                                 >&2
 	echo "  version  Print version number of AWS Profile"           >&2
 	echo ""                                                         >&2
@@ -97,7 +97,7 @@ while [ "$1" != "" ]; do
 			# This function is implemented in ~/.aws-profile.bash
 			exit 0
 			;;
-		status )
+		current )
 			aws configure list
 			exit 0
 			;;

@@ -16,6 +16,7 @@ aws-profile() {
 			if aws-profile.sh \$@ > /dev/null; then
 				echo "export AWS_PROFILE=\"\${2}\"" > ~/.aws-profile/current
 				source ~/.aws-profile/current &> /dev/null
+				aws configure list
 			fi
 			;;
 		reload )
