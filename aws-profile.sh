@@ -165,6 +165,14 @@ function aws_delete_profile() {
 	print_info "Successfully removed profile ${profile}!"
 }
 
+function aws_export_profile() {
+	local profile="${1}"
+	aws_access_key_id=$(get_toml_section_value "${profile}" "aws_access_key_id")
+	aws_secret_access_key=$(get_toml_section_value "${profile}" "aws_secret_access_key")
+	echo "export AWS_ACCESS_KEY_ID='${aws_access_key_id}'"
+	echo "export AWS_SECRET_ACCESS_KEY='${aws_secret_access_key}'"
+}
+
 # Make sure that the aws-cli is installed
 do_require_command "aws"
 
@@ -210,11 +218,8 @@ while [ "$1" != "" ]; do
 			profile="$(aws_get_profile "${1}")"
 			do_require_aws_profile_argument "${profile}"
 			do_require_aws_profile_exists "${profile}"
-			# Export aws credentials.
-			aws_access_key_id=$(get_toml_section_value "${profile}" "aws_access_key_id")
-			aws_secret_access_key=$(get_toml_section_value "${profile}" "aws_secret_access_key")
-			echo "export AWS_ACCESS_KEY_ID='${aws_access_key_id}'"
-			echo "export AWS_SECRET_ACCESS_KEY='${aws_secret_access_key}'"
+			# Export aws profile.
+			aws_export_profile "${profile}"
 			exit 0
 			;;
 		delete | remove | rm )
