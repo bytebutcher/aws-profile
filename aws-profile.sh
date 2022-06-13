@@ -148,9 +148,10 @@ function aws_get_profile() {
 
 function aws_delete_profile() {
 	local profile="${1}"
-	read -p "Are you sure you want to delete the profile '${profile}'? " -n 1 -r
+	read -p "Are you sure you want to delete the profile '${profile}'? (y/N) " -n 1 -r -s
+	echo >&2
 	if [[ ! $REPLY =~ ^[Yy]$ ]] ; then
-		print_info "Aborted."
+		echo "Aborted." >&2
 		return 1
 	fi
 	local aws_config_file="$(do_require_aws_config_file)"
