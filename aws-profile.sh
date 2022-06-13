@@ -8,7 +8,7 @@
 #   bytebutcher
 # ##################################################
 
-VERSION="1.1.0"
+VERSION="1.2.0"
 
 function usage() {
 	echo "AWS Profile allows to manage multiple aws user profiles." >&2
@@ -18,15 +18,16 @@ function usage() {
 	echo ""                                                         >&2
 	echo "Available Commands:"                                      >&2
 	echo "  add      Add an entry to a profile"                     >&2
-	echo "  use      Use a profile"                                 >&2
 	echo "  current  Show information about the current profile"    >&2
-	echo "  show     Show information about a profile"              >&2
-	echo "  list     List profiles"                                 >&2 
-	echo "  remove   Remove a profile"                              >&2 
-	echo "  update   Update a profile"                              >&2 
-	echo "  reload   Reload profile"                                >&2
-	echo "  version  Print version number of AWS Profile"           >&2
+	echo "  export   Prints access key id and secret access key"    >&2
 	echo "  help     Shows this help"                               >&2
+	echo "  list     List profiles"                                 >&2 
+	echo "  reload   Reload profile"                                >&2
+	echo "  remove   Remove a profile"                              >&2 
+	echo "  show     Show information about a profile"              >&2
+	echo "  update   Update a profile"                              >&2 
+	echo "  use      Use a profile"                                 >&2
+	echo "  version  Print version number of AWS Profile"           >&2
 	echo ""                                                         >&2
 	exit 1
 }
@@ -50,23 +51,65 @@ function do_require() {
 	}
 }
 
+function do_require_aws_config_file() {
+	local aws_config_file="${HOME}/.aws/config"
+	if ! [ -f "${aws_config_file}" ] ; then
+		print_error "Could not find aws config file at ${aws_config_file}!"
+		exit 1
+	fi
+	echo "${aws_config_file}"
+}
+
+function do_require_aws_credentials_file() {
+	local aws_credentials_file="${HOME}/.aws/credentials"
+	if ! [ -f "${aws_credentials_file}" ] ; then
+		print_error "Could not find aws config file at ${aws_credentials_file}!"
+		exit 1
+	fi
+	echo "${aws_credentials_file}"
+}
+
 function remove_toml_section() {
 	local section="${1}"
-	local file="${2}"
+	local aws_credentials_file="$(do_require_aws_credentials_file)"
+	local ignore=0
 	while read line; do 
-		if [[ $line == "[${section}]" ]]; then 
+		if [[ "${line}" == "[${section}]" ]]; then 
 			ignore=1
 			continue 
-		fi
-		if [[ "$line" =~ ^\[[A-Za-z]+\]$ ]] ; then 
+		elif [[ "${line}" =~ ^\[[A-Za-z]+\]$ ]] ; then 
 			ignore=0 
 		fi
-		if [[ $ignore == 1 ]]; then 
+		if [[ ${ignore} == 1 ]]; then 
 			continue
 		else 
 			echo "${line}"
 		fi; 
-	done< <(cat "${file}")
+	done< <(cat "${aws_credentials_file}")
+}
+
+function get_toml_section_value() {
+	local section="${1}"
+	local key="${2}"
+	local aws_credentials_file="$(do_require_aws_credentials_file)"
+	local section_found=false
+	while read line; do
+		if [[ ${line} == "[${section}]" ]] ; then
+			section_found=true
+			continue
+		fi
+		if [[ "${line}" =~ ^\[[A-Za-z]+\]$ ]] ; then
+                        section_found=false
+                fi
+		if [[ ${section_found} == true ]] ; then
+			_key=$(echo ${line} | awk -F' = ' '{ print $1 }')
+			_value=$(echo ${line} | awk -F' = ' '{ print $2 }')
+			if [[ "${_key}" == "${key}" ]] ; then
+				echo "${_value}"
+				break
+			fi
+		fi
+	done< <(cat "${aws_credentials_file}")
 }
 
 function aws_require_profile_argument() {
@@ -98,16 +141,8 @@ function aws_require_profile_exists() {
 
 function aws_delete_profile() {
 	local profile="${1}"
-	aws_config_file="${HOME}/.aws/config"
-	aws_credentials_file="${HOME}/.aws/credentials"
-	if ! [ -f "${aws_config_file}" ] ; then
-		print_error "Could not find aws config file at ${aws_config_file}!"
-		exit 1
-	fi
-	if ! [ -f "${aws_credentials_file}" ] ; then
-		print_error "Could not find aws config file at ${aws_credentials_file}!"
-		exit 1
-	fi
+	aws_config_file="$(do_require_aws_config_file)"
+	aws_credentials_file="$(do_require_aws_credentials_file)"
 	remove_toml_section "profile ${profile}" "${aws_config_file}" > "${aws_config_file}.bak"
 	mv "${aws_config_file}.bak" "${aws_config_file}"
 	
@@ -140,8 +175,6 @@ while [ "$1" != "" ]; do
 			aws_require_profile_not_exists "${profile}"
 			# Add aws profile.
 			aws configure --profile "${profile}"
-			# Use aws profile right away after creation.
-			echo "export AWS_PROFILE=${profile}"
 			exit
 			;;
 		list | ls )		   
@@ -155,6 +188,17 @@ while [ "$1" != "" ]; do
 			aws_require_profile_exists "${profile}"
 			# Use aws profile.
 			echo "export AWS_PROFILE=${profile}"
+			exit 0
+			;;
+		export)
+			shift
+			profile="${1}"
+			aws_require_profile_exists "${profile}"
+			# Export aws credentials.
+			aws_access_key_id=$(get_toml_section_value "${profile}" "aws_access_key_id")
+			aws_secret_access_key=$(get_toml_section_value "${profile}" "aws_secret_access_key")
+			echo "export AWS_ACCESS_KEY_ID='${aws_access_key_id}'"
+			echo "export AWS_SECRET_ACCESS_KEY='${aws_secret_access_key}'"
 			exit 0
 			;;
 		delete | remove | rm )
@@ -172,9 +216,7 @@ while [ "$1" != "" ]; do
 			aws_require_profile_exists "${profile}"
 			# Update aws profile.
 			aws configure --profile "${profile}"
-			# Use aws profile right away after creation.
-			echo "export AWS_PROFILE=${profile}"
-			exit
+			exit 0
 			;;
 		reload )
 			# This function is implemented in ~/.aws-profile.bash.
