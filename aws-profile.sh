@@ -17,12 +17,12 @@ function usage() {
 	echo "  aws-profile [command]"                                  >&2
 	echo ""                                                         >&2
 	echo "Available Commands:"                                      >&2
-	echo "  add      Add an entry to a profile"                     >&2
+	echo "  add      Add a profile"                                 >&2
 	echo "  current  Show information about the current profile"    >&2
 	echo "  export   Prints access key id and secret access key"    >&2
 	echo "  help     Shows this help"                               >&2
 	echo "  list     List profiles"                                 >&2 
-	echo "  reload   Reload profile"                                >&2
+	echo "  reload   Reload a profile"                              >&2
 	echo "  remove   Remove a profile"                              >&2 
 	echo "  show     Show information about a profile"              >&2
 	echo "  update   Update a profile"                              >&2 
