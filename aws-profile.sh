@@ -8,7 +8,7 @@
 #   bytebutcher
 # ##################################################
 
-VERSION="1.2.0"
+VERSION="1.4.0"
 
 function usage() {
 	echo "AWS Profile allows to manage multiple aws user profiles." >&2
@@ -29,7 +29,7 @@ function usage() {
 	echo "  use      Use a profile"                                 >&2
 	echo "  version  Print version number of AWS Profile"           >&2
 	echo ""                                                         >&2
-	exit 1
+	return 1
 }
 
 
@@ -43,7 +43,7 @@ function print_error() {
     echo -e "\e[01;31m[ERROR] \e[0m${message}" >&2;
 }
 
-function do_require() {
+function do_require_command() {
 	local required_command="${1}"
 	command -v "${required_command}" >/dev/null 2>&1 || {
 		print_error "Require ${required_command} but it's not installed. Aborting."
@@ -51,22 +51,21 @@ function do_require() {
 	}
 }
 
-function do_require_aws_config_file() {
-	local aws_config_file="${HOME}/.aws/config"
-	if ! [ -f "${aws_config_file}" ] ; then
-		print_error "Could not find aws config file at ${aws_config_file}!"
+function do_require_file() {
+	local file="${1}"
+	if ! [ -f "${file}" ] ; then
+		print_error "Could not find ${file}!"
 		exit 1
 	fi
-	echo "${aws_config_file}"
+	echo "${file}"
+}
+
+function do_require_aws_config_file() {
+	do_require_file "${HOME}/.aws/config"
 }
 
 function do_require_aws_credentials_file() {
-	local aws_credentials_file="${HOME}/.aws/credentials"
-	if ! [ -f "${aws_credentials_file}" ] ; then
-		print_error "Could not find aws config file at ${aws_credentials_file}!"
-		exit 1
-	fi
-	echo "${aws_credentials_file}"
+	do_require_file "${HOME}/.aws/credentials"
 }
 
 function remove_toml_section() {
@@ -112,37 +111,50 @@ function get_toml_section_value() {
 	done< <(cat "${aws_credentials_file}")
 }
 
-function aws_require_profile_argument() {
+function do_require_aws_profile_argument() {
 	local profile="${1}"
 	if [ -z "${profile}" ] ; then
-		print_error "No profile name specified!"
 		usage
+		print_error "No profile name specified!"
 		exit 1
 	fi
 }
 
-function aws_require_profile_not_exists() {
+function do_require_aws_profile_not_exists() {
 	local profile="${1}"
-	aws_require_profile_argument "${profile}"
 	if aws configure list-profiles | grep -e "^${profile}$" > /dev/null; then 
 		print_error "The profile named '${profile}' already exists!"
 		exit 1
 	fi
 }
 
-function aws_require_profile_exists() {
+function do_require_aws_profile_exists() {
 	local profile="${1}"
-	aws_require_profile_argument "${profile}"
 	if ! aws configure list-profiles | grep -e "^${profile}$" > /dev/null; then 
 		print_error "The profile named '${profile}' does not exist!"
 		exit 1
 	fi
 }
 
+function aws_get_profile() {
+	local profile="${1}"
+	if [ -z "${profile}" ] && [ -n "${AWS_PROFILE}" ] ; then
+		# If no profile was provided by the user use the one stored 
+		# in the environment variable AWS_PROFILE, if available.
+		profile="${AWS_PROFILE}"
+	fi
+	echo "${profile}"
+}
+
 function aws_delete_profile() {
 	local profile="${1}"
-	aws_config_file="$(do_require_aws_config_file)"
-	aws_credentials_file="$(do_require_aws_credentials_file)"
+	read -p "Are you sure you want to delete the profile '${profile}'? " -n 1 -r
+	if [[ ! $REPLY =~ ^[Yy]$ ]] ; then
+		print_info "Aborted."
+		return 1
+	fi
+	local aws_config_file="$(do_require_aws_config_file)"
+	local aws_credentials_file="$(do_require_aws_credentials_file)"
 	remove_toml_section "profile ${profile}" "${aws_config_file}" > "${aws_config_file}.bak"
 	mv "${aws_config_file}.bak" "${aws_config_file}"
 	
@@ -153,7 +165,7 @@ function aws_delete_profile() {
 }
 
 # Make sure that the aws-cli is installed
-do_require "aws"
+do_require_command "aws"
 
 # Assert that aws-cli version is at least 2.0
 if ! [[ "$(aws --version)" =~ ^aws-cli/2.* ]] ; then
@@ -171,8 +183,9 @@ while [ "$1" != "" ]; do
 	case $1 in
 		add )
 			shift
-			profile="${1}"
-			aws_require_profile_not_exists "${profile}"
+			profile="$(aws_get_profile "${1}")"
+			do_require_aws_profile_argument "${profile}"
+			do_require_aws_profile_not_exists "${profile}"
 			# Add aws profile.
 			aws configure --profile "${profile}"
 			exit
@@ -184,16 +197,18 @@ while [ "$1" != "" ]; do
 			;;
 		use )
 			shift
-			profile="${1}"
-			aws_require_profile_exists "${profile}"
+			profile="$(aws_get_profile "${1}")"
+			do_require_aws_profile_argument "${profile}"
+			do_require_aws_profile_exists "${profile}"
 			# Use aws profile.
 			echo "export AWS_PROFILE=${profile}"
 			exit 0
 			;;
 		export)
 			shift
-			profile="${1}"
-			aws_require_profile_exists "${profile}"
+			profile="$(aws_get_profile "${1}")"
+			do_require_aws_profile_argument "${profile}"
+			do_require_aws_profile_exists "${profile}"
 			# Export aws credentials.
 			aws_access_key_id=$(get_toml_section_value "${profile}" "aws_access_key_id")
 			aws_secret_access_key=$(get_toml_section_value "${profile}" "aws_secret_access_key")
@@ -203,17 +218,17 @@ while [ "$1" != "" ]; do
 			;;
 		delete | remove | rm )
 			shift
-			profile="${1}"
-			aws_require_profile_exists "${profile}"
-			# At the moment there is no aws configure built-in function to
-			# remove a profile.
+			profile="$(aws_get_profile "${1}")"
+			do_require_aws_profile_argument "${profile}"
+			do_require_aws_profile_exists "${profile}"
 			aws_delete_profile "${profile}"
 			exit 0
 			;;
 		update )
 			shift
-			profile="${1}"
-			aws_require_profile_exists "${profile}"
+			profile="$(aws_get_profile "${1}")"
+			do_require_aws_profile_argument "${profile}"
+			do_require_aws_profile_exists "${profile}"
 			# Update aws profile.
 			aws configure --profile "${profile}"
 			exit 0
@@ -229,8 +244,9 @@ while [ "$1" != "" ]; do
 			;;
 		show )
 			shift
-			profile="${1}"
-			aws_require_profile_exists "${profile}"
+			profile="$(aws_get_profile "${1}")"
+			do_require_aws_profile_argument "${profile}"
+			do_require_aws_profile_exists "${profile}"
 			# Show specified aws profile.
 			aws configure list --profile "${profile}"
 			exit 0
