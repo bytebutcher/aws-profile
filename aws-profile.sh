@@ -238,6 +238,12 @@ while [ "$1" != "" ]; do
 			exit 0
 			;;
 		current )
+			profile="$(aws_get_profile "")"
+			if [ -z "${profile}" ] ; then
+				usage
+				print_error "No profile selected!"
+				exit 1
+			fi
 			# Show currently active aws profile.
 			aws configure list
 			exit 0
