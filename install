@@ -27,7 +27,7 @@ aws-profile() {
 			;;
 	esac
 }
-export -f aws-profile > /dev/null
+export -f aws-profile &> /dev/null
 export PATH=~/.aws-profile/:\${PATH}
 source ~/.aws-profile/current &> /dev/null
 EOF

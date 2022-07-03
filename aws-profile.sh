@@ -8,7 +8,7 @@
 #   bytebutcher
 # ##################################################
 
-VERSION="1.4.0"
+VERSION="1.4.1"
 
 function usage() {
 	echo "AWS Profile allows to manage multiple aws user profiles." >&2
