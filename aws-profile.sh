@@ -8,7 +8,18 @@
 #   bytebutcher
 # ##################################################
 
-VERSION="1.4.1"
+VERSION="1.5.0"
+
+# ROADMAP
+# -------
+#
+# - aws-profile export should export REGION and FORMAT, too
+# - aws-profile import should ask for region and format
+# - README.md should show examples
+# - README.md should include build and license badge.
+
+
+toml_section_regex='^\[[[:space:]A-Za-z0-9_-]+\]$'
 
 function usage() {
 	echo "AWS Profile allows to manage multiple aws user profiles." >&2
@@ -21,6 +32,7 @@ function usage() {
 	echo "  current  Show information about the current profile"    >&2
 	echo "  export   Prints access key id and secret access key"    >&2
 	echo "  help     Shows this help"                               >&2
+        echo "  import   Imports a profile from a given JSON file"      >&2
 	echo "  list     List profiles"                                 >&2 
 	echo "  reload   Reload a profile"                              >&2
 	echo "  remove   Remove a profile"                              >&2 
@@ -29,7 +41,6 @@ function usage() {
 	echo "  use      Use a profile"                                 >&2
 	echo "  version  Print version number of AWS Profile"           >&2
 	echo ""                                                         >&2
-	return 1
 }
 
 
@@ -43,6 +54,11 @@ function print_error() {
     echo -e "\e[01;31m[ERROR] \e[0m${message}" >&2;
 }
 
+function handle_error() {
+	print_error "Unknown error! Aborting..."
+	exit 1 
+}
+
 function do_require_command() {
 	local required_command="${1}"
 	command -v "${required_command}" >/dev/null 2>&1 || {
@@ -54,50 +70,56 @@ function do_require_command() {
 function do_require_file() {
 	local file="${1}"
 	if ! [ -f "${file}" ] ; then
-		print_error "Could not find ${file}!"
+		print_error "The file '${file}' does not exist!"
 		exit 1
 	fi
 	echo "${file}"
 }
 
 function do_require_aws_config_file() {
-	do_require_file "${HOME}/.aws/config"
+	config_file="${HOME}/.aws/config"
+	if ! [ -d ~/.aws ] ; then
+		mkdir ~/.aws
+	fi
+	touch "${config_file}"
+	echo "${config_file}"
 }
 
 function do_require_aws_credentials_file() {
-	do_require_file "${HOME}/.aws/credentials"
+	local credentials_file="${HOME}/.aws/credentials"
+	if ! [ -d ~/.aws ] ; then
+		mkdir ~/.aws
+	fi
+	touch "${credentials_file}"
+	echo "${credentials_file}"
 }
 
 function remove_toml_section() {
 	local section="${1}"
-	local aws_credentials_file="$(do_require_aws_credentials_file)"
-	local ignore=0
-	while read line; do 
-		if [[ "${line}" == "[${section}]" ]]; then 
-			ignore=1
-			continue 
-		elif [[ "${line}" =~ ^\[[A-Za-z]+\]$ ]] ; then 
-			ignore=0 
-		fi
-		if [[ ${ignore} == 1 ]]; then 
-			continue
-		else 
-			echo "${line}"
-		fi; 
-	done< <(cat "${aws_credentials_file}")
+        local toml_file="${2}"
+        local ignore=0
+        while IFS= read -r line; do
+                if [[ "${line}" == "[${section}]" ]]; then
+                        ignore=1
+                        continue
+                elif [[ "${line}" =~ ${toml_section_regex} ]] ; then
+                        ignore=0
+                fi
+                [[ ${ignore} == 0 ]] && echo "${line}"
+        done < "${toml_file}"
 }
 
 function get_toml_section_value() {
 	local section="${1}"
 	local key="${2}"
-	local aws_credentials_file="$(do_require_aws_credentials_file)"
+	local toml_file="${3}"
 	local section_found=false
 	while read line; do
 		if [[ ${line} == "[${section}]" ]] ; then
 			section_found=true
 			continue
 		fi
-		if [[ "${line}" =~ ^\[[A-Za-z]+\]$ ]] ; then
+		if [[ "${line}" =~ ${toml_section_regex} ]] ; then
                         section_found=false
                 fi
 		if [[ ${section_found} == true ]] ; then
@@ -108,7 +130,7 @@ function get_toml_section_value() {
 				break
 			fi
 		fi
-	done< <(cat "${aws_credentials_file}")
+	done< <(cat "${toml_file}")
 }
 
 function do_require_aws_profile_argument() {
@@ -167,11 +189,54 @@ function aws_delete_profile() {
 
 function aws_export_profile() {
 	local profile="${1}"
-	aws_access_key_id=$(get_toml_section_value "${profile}" "aws_access_key_id")
-	aws_secret_access_key=$(get_toml_section_value "${profile}" "aws_secret_access_key")
+	local aws_credentials_file="$(do_require_aws_credentials_file)"
+	aws_access_key_id=$(get_toml_section_value "${profile}" "aws_access_key_id" "${aws_credentials_file}")
+	aws_secret_access_key=$(get_toml_section_value "${profile}" "aws_secret_access_key" "${aws_credentials_file}")
 	echo "export AWS_ACCESS_KEY_ID='${aws_access_key_id}'"
 	echo "export AWS_SECRET_ACCESS_KEY='${aws_secret_access_key}'"
 }
+
+function aws_import_profile() {
+	# Make sure that jq is installed for being able to parse the json file
+	do_require_command "jq"
+
+	local profile="${1}"
+	do_require_aws_profile_not_exists "${1}"
+	local aws_config_file="$(do_require_aws_config_file)"
+	local aws_credentials_file="$(do_require_aws_credentials_file)"
+
+	local credentials_json="${2}"
+	local aws_access_key=$(cat $credentials_json | jq -r .AccessKeyId)
+	local aws_secret_access_key=$(cat $credentials_json | jq -r .SecretAccessKey)
+	local aws_session_token=$(cat $credentials_json | jq -r .Token)
+	echo "[${profile}]" >> "${aws_config_file}"
+	cat <<EOL >> "${aws_credentials_file}"
+[${profile}]
+aws_access_key_id = $aws_access_key
+aws_secret_access_key = $aws_secret_access_key
+aws_session_token = $aws_session_token
+EOL
+	print_info "Successfully imported profile ${profile} from ${file}!"
+}
+
+function aws_update_profile() {
+	local profile="${1}"
+	if aws configure --profile "${profile}" ; then
+		local aws_credentials_file="$(do_require_aws_credentials_file)"
+		local aws_session_token=$(get_toml_section_value "${profile}" "aws_session_token" "${aws_credentials_file}")
+		if [ -n "${aws_session_token}" ] ; then
+			read -p "AWS Session Token [*****************]: " AWS_SESSION_TOKEN
+			if [ -n "${AWS_SESSION_TOKEN}" ] ; then
+				aws_session_token="${AWS_SESSION_TOKEN}"
+			fi
+		fi
+		if [ -n "${aws_session_token}" ] ; then
+			aws configure --profile "${profile}" set aws_session_token "${aws_session_token}"
+		fi
+	fi
+}
+
+#trap 'handle_error' ERR
 
 # Make sure that the aws-cli is installed
 do_require_command "aws"
@@ -192,11 +257,19 @@ while [ "$1" != "" ]; do
 	case $1 in
 		add )
 			shift
-			profile="$(aws_get_profile "${1}")"
-			do_require_aws_profile_argument "${profile}"
+			profile="${1}"
+			if [ -z "${profile}" ] ; then
+                                echo "Usage: aws-profile add <profile-name>" >&2
+                                exit 1
+                        fi
 			do_require_aws_profile_not_exists "${profile}"
 			# Add aws profile.
-			aws configure --profile "${profile}"
+			if aws configure --profile "${profile}" ; then
+				read -p "AWS Session Token [None]: " AWS_SESSION_TOKEN
+				if [ -n "${AWS_SESSION_TOKEN}" ] ; then
+					aws configure --profile "${profile}" set aws_session_token "${AWS_SESSION_TOKEN}"
+				fi
+			fi
 			exit
 			;;
 		list | ls )		   
@@ -206,20 +279,37 @@ while [ "$1" != "" ]; do
 			;;
 		use )
 			shift
-			profile="$(aws_get_profile "${1}")"
+			profile="${1}"
+			if [ -z "${profile}" ] ; then
+                                echo "Usage: aws-profile use <profile-name>" >&2
+                                exit 1
+                        fi
 			do_require_aws_profile_argument "${profile}"
 			do_require_aws_profile_exists "${profile}"
 			# Use aws profile.
 			echo "export AWS_PROFILE=${profile}"
 			exit 0
 			;;
-		export)
+		export )
 			shift
 			profile="$(aws_get_profile "${1}")"
 			do_require_aws_profile_argument "${profile}"
 			do_require_aws_profile_exists "${profile}"
 			# Export aws profile.
 			aws_export_profile "${profile}"
+			exit 0
+			;;
+		import )
+			shift
+			profile="${1}"
+			file="${2}"
+			if [ -z "${file}" ] || [ -z "${profile}" ] ; then
+				echo "Usage: aws-profile import <profile-name> <json-file>" >&2
+				exit 1
+			fi
+			do_require_aws_profile_not_exists "${profile}"
+			do_require_file "${file}"
+			aws_import_profile "${profile}" "${file}"
 			exit 0
 			;;
 		delete | remove | rm )
@@ -236,7 +326,7 @@ while [ "$1" != "" ]; do
 			do_require_aws_profile_argument "${profile}"
 			do_require_aws_profile_exists "${profile}"
 			# Update aws profile.
-			aws configure --profile "${profile}"
+			aws_update_profile "${profile}"
 			exit 0
 			;;
 		reload )
@@ -271,6 +361,20 @@ while [ "$1" != "" ]; do
 			echo "AWS Profile"
 			echo "Version: ${VERSION}"
 			exit 0
+			;;
+		test )
+			if ! [ -f /.dockerenv ]; then
+				echo "ERROR: To avoid side-effects tests can only be run inside a docker container!" >&2
+				exit 1
+			fi
+			do_require_command "bats"
+			script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+			if ! [ -f "${script_dir}/test_aws-profile.sh" ] ; then
+				echo "ERROR: test_aws_profile.sh was not found!" >&2
+				exit 1
+			fi
+			bats "${script_dir}/test_aws-profile.sh"
+			exit
 			;;
 		* )
 			usage

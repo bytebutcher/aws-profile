@@ -17,15 +17,19 @@ Usage:
   aws-profile [command]
 
 Available Commands:
-  add      Add an entry to a profile
+  add      Add a profile
   current  Show information about the current profile
   export   Prints access key id and secret access key
   help     Shows this help
+  import   Imports a profile from a given JSON file
   list     List profiles
-  reload   Reload profile
+  reload   Reload a profile
   remove   Remove a profile
   show     Show information about a profile
   update   Update a profile
   use      Use a profile
   version  Print version number of AWS Profile
+
+
 ```
+
