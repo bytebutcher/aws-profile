@@ -1,12 +1,29 @@
 #!/bin/bash
-if ! [ -d ~/.aws-profile/ ] ; then
-	script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-	if ! [ -f "${script_dir}/aws-profile.sh" ] ; then
-		# Download aws-profile from github
+function do_require_command() {
+        local required_command="${1}"
+        command -v "${required_command}" >/dev/null 2>&1 || {
+                print_error "Require ${required_command} but it's not installed. Aborting."
+                exit 1;
+        }
+}
+
+do_require_command "git"
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+if ! [ -f "${script_dir}/aws-profile.sh" ] ; then
+	if ! [ -d ~/.aws-profile/.git ] ; then
+		echo "Installing aws-profile via github..." >&2
 		git clone https://github.com/bytebutcher/aws-profile ~/.aws-profile/
 	else
-		# Copy from filesystem
-		mkdir ~/.aws-profile/
+		echo "Updating aws-profile via github..." >&2
+		(cd ~/.aws-profile && git pull)
+	fi
+else
+	mkdir -p ~/.aws-profile/
+	if ! [ -f ~/.aws-profile/aws-profile.sh ] ; then
+		echo "Installing aws-profile..." >&2
+		cp "${script_dir}/aws-profile.sh" ~/.aws-profile/
+	else
+		echo "Updating aws-profile..." >&2
 		cp "${script_dir}/aws-profile.sh" ~/.aws-profile/
 	fi
 fi
@@ -51,7 +68,7 @@ if ! grep "\[ -f ~/.aws-profile.bash \] && source ~/.aws-profile.bash" ~/.bashrc
 	echo "[ -f ~/.aws-profile.bash ] && source ~/.aws-profile.bash" >> ~/.bashrc
 fi
 
-echo "Finished. Restart your shell or reload config file."
+echo "Finished. Restart your shell or reload config file." >&2
 [[ "$shells" =~ bash ]] && echo "   source ~/.bashrc  # bash"
 #[[ "$shells" =~ zsh ]]  && echo "   source ${ZDOTDIR:-~}/.zshrc   # zsh"
 #[[ "$shells" =~ fish ]] && [ $key_bindings -eq 1 ] && echo "   fzf_key_bindings  # fish"

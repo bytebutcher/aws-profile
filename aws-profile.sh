@@ -13,7 +13,6 @@ VERSION="1.5.0"
 # ROADMAP
 # -------
 #
-# - aws-profile export should export REGION and FORMAT, too
 # - aws-profile import should ask for region and format
 # - README.md should show examples
 # - README.md should include build and license badge.
@@ -189,11 +188,25 @@ function aws_delete_profile() {
 
 function aws_export_profile() {
 	local profile="${1}"
+	local aws_config_file="$(do_require_aws_config_file)"
 	local aws_credentials_file="$(do_require_aws_credentials_file)"
 	aws_access_key_id=$(get_toml_section_value "${profile}" "aws_access_key_id" "${aws_credentials_file}")
+
 	aws_secret_access_key=$(get_toml_section_value "${profile}" "aws_secret_access_key" "${aws_credentials_file}")
+	aws_session_token=$(get_toml_section_value "${profile}" "aws_session_token" "${aws_credentials_file}")
+	aws_region=$(get_toml_section_value "${profile}" "region" "${aws_config_file}")
+	aws_output=$(get_toml_section_value "${profile}" "output" "${aws_config_file}")
 	echo "export AWS_ACCESS_KEY_ID='${aws_access_key_id}'"
 	echo "export AWS_SECRET_ACCESS_KEY='${aws_secret_access_key}'"
+	if [ -n "${aws_region}" ] ; then
+		echo "export AWS_DEFAULT_REGION=${aws_region}"
+	fi
+	if [ -n "${aws_output}" ] ; then
+		echo "export AWS_DEFAULT_OUTPUT=${aws_output}"
+	fi
+	if [ -n "${aws_session_token}" ] ; then
+		echo "export AWS_SESSION_TOKEN=${aws_session_token}"
+	fi
 }
 
 function aws_import_profile() {
