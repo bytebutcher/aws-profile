@@ -8,7 +8,7 @@
 #   bytebutcher
 # ##################################################
 
-VERSION="1.5.0"
+VERSION="1.6.0"
 
 # ROADMAP
 # -------
@@ -17,8 +17,14 @@ VERSION="1.5.0"
 # - README.md should show examples
 # - README.md should include build and license badge.
 
-
-toml_section_regex='^\[[[:space:]A-Za-z0-9_-]+\]$'
+AWS_ENVIRONMENT_VARIABLES=(
+	"AWS_ACCESS_KEY_ID"
+	"AWS_SECRET_ACCESS_KEY"
+	"AWS_DEFAULT_REGION"
+	"AWS_DEFAULT_FORMAT"
+	"AWS_SESSION_TOKEN"
+)
+TOML_SECTION_REGEX='^\[[[:space:]A-Za-z0-9_-]+\]$'
 
 function usage() {
 	echo "AWS Profile allows to manage multiple aws user profiles." >&2
@@ -51,6 +57,11 @@ function print_info() {
 function print_error() {
     local message="${1}"
     echo -e "\e[01;31m[ERROR] \e[0m${message}" >&2;
+}
+
+function print_warning() {
+	local message="${1}"
+	echo -e "\033[1;33m[WARNING] \033[0m${message}" >&2;
 }
 
 function handle_error() {
@@ -101,7 +112,7 @@ function remove_toml_section() {
                 if [[ "${line}" == "[${section}]" ]]; then
                         ignore=1
                         continue
-                elif [[ "${line}" =~ ${toml_section_regex} ]] ; then
+                elif [[ "${line}" =~ ${TOML_SECTION_REGEX} ]] ; then
                         ignore=0
                 fi
                 [[ ${ignore} == 0 ]] && echo "${line}"
@@ -118,7 +129,7 @@ function get_toml_section_value() {
 			section_found=true
 			continue
 		fi
-		if [[ "${line}" =~ ${toml_section_regex} ]] ; then
+		if [[ "${line}" =~ ${TOML_SECTION_REGEX} ]] ; then
                         section_found=false
                 fi
 		if [[ ${section_found} == true ]] ; then
@@ -194,18 +205,18 @@ function aws_export_profile() {
 
 	aws_secret_access_key=$(get_toml_section_value "${profile}" "aws_secret_access_key" "${aws_credentials_file}")
 	aws_session_token=$(get_toml_section_value "${profile}" "aws_session_token" "${aws_credentials_file}")
-	aws_region=$(get_toml_section_value "${profile}" "region" "${aws_config_file}")
-	aws_output=$(get_toml_section_value "${profile}" "output" "${aws_config_file}")
+	aws_region=$(get_toml_section_value "profile ${profile}" "region" "${aws_config_file}")
+	aws_output=$(get_toml_section_value "profile ${profile}" "output" "${aws_config_file}")
 	echo "export AWS_ACCESS_KEY_ID='${aws_access_key_id}'"
 	echo "export AWS_SECRET_ACCESS_KEY='${aws_secret_access_key}'"
 	if [ -n "${aws_region}" ] ; then
-		echo "export AWS_DEFAULT_REGION=${aws_region}"
+		echo "export AWS_DEFAULT_REGION='${aws_region}'"
 	fi
 	if [ -n "${aws_output}" ] ; then
-		echo "export AWS_DEFAULT_OUTPUT=${aws_output}"
+		echo "export AWS_DEFAULT_OUTPUT='${aws_output}'"
 	fi
 	if [ -n "${aws_session_token}" ] ; then
-		echo "export AWS_SESSION_TOKEN=${aws_session_token}"
+		echo "export AWS_SESSION_TOKEN='${aws_session_token}'"
 	fi
 }
 
@@ -230,6 +241,20 @@ aws_secret_access_key = $aws_secret_access_key
 aws_session_token = $aws_session_token
 EOL
 	print_info "Successfully imported profile ${profile} from ${file}!"
+}
+
+function aws_use_profile() {
+	local profile="${1}"
+	echo "export AWS_PROFILE=${profile}"
+	override_warning=""
+	for aws_environment_variable in "${AWS_ENVIRONMENT_VARIABLES[@]}"; do
+		if [[ -v "$aws_environment_variable" ]]; then
+			override_warning+="'${aws_environment_variable}'"
+		fi
+	done
+	if [[ -n "${override_warning}" ]] ; then
+		print_warning "The following variable(s) are set and might override the ones set in the profile: $override_warning"
+	fi
 }
 
 function aws_update_profile() {
@@ -299,8 +324,8 @@ while [ "$1" != "" ]; do
                         fi
 			do_require_aws_profile_argument "${profile}"
 			do_require_aws_profile_exists "${profile}"
-			# Use aws profile.
-			echo "export AWS_PROFILE=${profile}"
+			# Use aws profile. 
+			aws_use_profile "${profile}"
 			exit 0
 			;;
 		export )

@@ -3,8 +3,10 @@ Allows to add and switch between multiple user profiles.
 
 ## Setup
 
-To install aws-profile just execute the following command:
+To install aws-profile just execute the following commands:
 ```
+sudo apt update && apt-get install -y git python3 python3-pip jq
+pip3 install git+https://github.com/aws/aws-cli.git@v2
 bash <(curl -s https://raw.githubusercontent.com/bytebutcher/aws-profile/master/install)
 ```
 

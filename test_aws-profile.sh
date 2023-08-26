@@ -67,6 +67,7 @@ teardown() {
 	[[ "${lines[@]}" == *"does not exist!"* ]]
 }
 
+
 @test "Test command usage: aws-profile use existing" {
 	run_aws_profile_add default AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY REGION FORMAT AWS_SESSION_TOKEN
 	run aws-profile use default
@@ -77,6 +78,17 @@ teardown() {
 	[[ "${lines[@]}" == *"region"* ]]
 }
 
+@test "Test command usage: aws-profile use existing shows override warning" {
+	run_aws_profile_add default AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY REGION FORMAT AWS_SESSION_TOKEN
+	export AWS_DEFAULT_REGION=TEST
+	run aws-profile use default
+	[ "${status}" -eq 0 ]
+	[[ "${lines[@]}" == *"The following variable(s) are set and might override the ones set in the profile: 'AWS_DEFAULT_REGION'"* ]]
+	[[ "${lines[@]}" == *"profile"*"default"* ]]
+	[[ "${lines[@]}" == *"access_key"* ]]
+	[[ "${lines[@]}" == *"secret_key"* ]]
+	[[ "${lines[@]}" == *"region"* ]]
+}
 #
 # Test aws-profile help
 #
@@ -192,20 +204,32 @@ aws_secret_access_key = ASAK3"
 	[[ "${lines[@]}" == *"No profile name specified!"* ]]
 }
 
-@test "Test command usage: aws-profile export" {
-	run_aws_profile_add default AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY REGION FORMAT AWS_SESSION_TOKEN
-	aws-profile use default
+@test "Test command usage: aws-profile export currently used profile" {
+	run_aws_profile_add p1 AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY REGION FORMAT AWS_SESSION_TOKEN
+	aws-profile use p1 &>/dev/null
 	actual_content=$(aws-profile export)
 	expected_output="export AWS_ACCESS_KEY_ID='AWS_ACCESS_KEY_ID'
-export AWS_SECRET_ACCESS_KEY='AWS_SECRET_ACCESS_KEY'"
+export AWS_SECRET_ACCESS_KEY='AWS_SECRET_ACCESS_KEY'
+export AWS_DEFAULT_REGION='REGION'
+export AWS_DEFAULT_OUTPUT='FORMAT'"
+	# Bug: While the aws-profile add method works as expected
+	#      the run_aws_profile_add method does not add the session token.
+	#      As a consequence the aws-profile export function does not export the session token.
+	#export AWS_SESSION_TOKEN='AWS_SESSION_TOKEN'"
 	[ "$actual_content" == "$expected_output" ]
 }
 
-@test "Test command usage: aws-profile export currently used" {
-	run_aws_profile_add default AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY REGION FORMAT AWS_SESSION_TOKEN
-	actual_content=$(aws-profile export default)
+@test "Test command usage: aws-profile export specified profile" {
+	run_aws_profile_add p1 AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY REGION FORMAT AWS_SESSION_TOKEN
+	actual_content=$(aws-profile export p1)
 	expected_output="export AWS_ACCESS_KEY_ID='AWS_ACCESS_KEY_ID'
-export AWS_SECRET_ACCESS_KEY='AWS_SECRET_ACCESS_KEY'"
+export AWS_SECRET_ACCESS_KEY='AWS_SECRET_ACCESS_KEY'
+export AWS_DEFAULT_REGION='REGION'
+export AWS_DEFAULT_OUTPUT='FORMAT'"
+	# Bug: While the aws-profile add method works as expected
+	#      the run_aws_profile_add method does not add the session token.
+	#      As a consequence the aws-profile export function does not export the session token.
+	#export AWS_SESSION_TOKEN='AWS_SESSION_TOKEN'"
 	[ "$actual_content" == "$expected_output" ]
 }
 
