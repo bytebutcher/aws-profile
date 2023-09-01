@@ -1,6 +1,6 @@
 <br/><br/>
 <div align="center">
-    <img src="https://github.com/bytebutcher/pydfql/raw/main/images/aws-profile.png" alt="aws-profile Logo"/>
+    <img src="https://github.com/bytebutcher/aws-profile/raw/main/images/aws-profile.png" alt="aws-profile Logo"/>
     <h1 align="center" style="margin-top: 0px;">aws-profile</h1>
 
  ![Version: 1.6.0](https://img.shields.io/badge/Version-1.6.0-green)
