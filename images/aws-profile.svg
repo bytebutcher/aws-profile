@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="80.264557mm"
+   height="80.264557mm"
+   viewBox="0 0 80.264557 80.264557"
+   version="1.1"
+   id="svg5"
+   xml:space="preserve"
+   sodipodi:docname="aws-profile.svg"
+   inkscape:export-filename="../6b2846b7/aws-profile.png"
+   inkscape:export-xdpi="41.829071"
+   inkscape:export-ydpi="41.829071"
+   inkscape:version="1.2.2 (732a01da63, 2022-12-09, custom)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><sodipodi:namedview
+     id="namedview7"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     showgrid="false"
+     showguides="true"
+     inkscape:zoom="0.5"
+     inkscape:cx="359"
+     inkscape:cy="-41"
+     inkscape:window-width="2522"
+     inkscape:window-height="1302"
+     inkscape:window-x="1929"
+     inkscape:window-y="119"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1"><inkscape:grid
+       type="xygrid"
+       id="grid316"
+       originx="-51.589728"
+       originy="-79.735439" /></sodipodi:namedview><defs
+     id="defs2" /><g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-51.589725,-79.735439)"><text
+       xml:space="preserve"
+       style="font-size:3.175px;fill:#000000;stroke:#000000;stroke-width:5.69799;stroke-dasharray:none;stroke-opacity:1"
+       x="72.161278"
+       y="167.78172"
+       id="text1181"><tspan
+         sodipodi:role="line"
+         id="tspan1179"
+         style="stroke-width:5.698"
+         x="72.161278"
+         y="167.78172" /></text><path
+       style="fill:#ff6600;stroke:#ff6600;stroke-width:0.241881;stroke-dasharray:none;stroke-opacity:1"
+       d=""
+       id="path1310"
+       transform="scale(0.26458333)" /><path
+       style="fill:#ff6600;stroke:#ff6600;stroke-width:0.00377939;stroke-dasharray:none;stroke-opacity:1"
+       d="m 379.98823,495.71583 0.003,-0.0433 0.54998,-0.36828 c 2.90364,-1.94437 5.93023,-3.72387 9.23382,-5.42906 6.60848,-3.41107 13.96454,-6.29742 21.82257,-8.56268 l 0.0475,-0.0137 v 0.0339 c 0,0.0394 0.0751,0.0129 -0.57998,0.2048 -5.76621,1.68906 -11.36874,3.75414 -16.47441,6.07245 -4.62596,2.10048 -8.99097,4.4754 -12.94454,7.04285 -0.30493,0.19803 -1.22512,0.80978 -1.45994,0.97059 -0.0962,0.0659 -0.1809,0.12343 -0.18812,0.12782 -0.0102,0.006 -0.0124,-0.002 -0.01,-0.0353 z"
+       id="path1349"
+       transform="scale(0.26458333)" /><switch
+       id="switch4857"
+       transform="matrix(1.1086265,0,0,1.1086265,25.204414,53.350128)">
+	<foreignObject
+   width="1"
+   height="1"
+   requiredExtensions="http://ns.adobe.com/AdobeIllustrator/10.0/">
+		
+	</foreignObject>
+	<g
+   id="g4855"
+   style="fill:#ff7f2a">
+		<path
+   class="st0"
+   d="M 60,23.8 C 40,23.8 23.8,40 23.8,60 23.8,80 40,96.2 60,96.2 80,96.2 96.2,80 96.2,60 96.2,40 80,23.8 60,23.8 Z m 0.1,53.3 H 44.4 c 0,-8.8 6.1,-10.8 9.8,-12.6 1,-0.5 1.5,-1.1 1.6,-2.6 0.2,-2.3 -4.2,-3.6 -4.2,-10.2 0,-5.8 3.9,-10.5 8.6,-10.5 4.7,0 8.6,4.7 8.6,10.5 0,6.6 -4.4,7.9 -4.2,10.2 0.1,1.5 0.5,2.1 1.6,2.6 3.7,1.8 9.8,3.8 9.8,12.6 z"
+   id="path4853"
+   style="fill:#ff7f2a" />
+	</g>
+</switch></g></svg>

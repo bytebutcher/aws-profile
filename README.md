@@ -1,5 +1,23 @@
-# aws-profile
-Allows to add and switch between multiple user profiles.
+<br/><br/>
+<div align="center">
+    <img src="https://github.com/bytebutcher/pydfql/raw/main/images/aws-profile.png" alt="aws-profile Logo"/>
+    <h1 align="center" style="margin-top: 0px;">aws-profile</h1>
+
+ ![Version: 1.6.0](https://img.shields.io/badge/Version-1.6.0-green)
+ [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+</div>
+<br/>
+
+
+**aws-profile** is a CLI utility designed to simplify the management of multiple AWS profiles. 
+It offers a user-friendly interface for operations like adding, updating, and switching between 
+AWS profiles, making it easy to manage your AWS configurations.
+
+## Features
+
+* **Simplified Management:** Intuitive commands for creating, deleting, and modifying AWS profiles.
+* **Visibility:** View all profiles and their configurations at a glance.
+* **Import/Export:** Import profiles directly from AWS STS or export them for sharing.
 
 ## Setup
 
@@ -34,7 +52,8 @@ Available Commands:
 
 ```
 
-**Add profile:**
+### Add a New Profile
+Run the **add** command to create a new profile. You'll be prompted for AWS credentials and configurations.
 ```
 $ aws-profile add foo
 AWS ACCESS KEY ID [None]: AKIAIOSFODNN7EXAMPLE
@@ -44,13 +63,15 @@ Default output format [None]: json
 AWS SESSION TOKEN [None]: AQoEXAMPLEH4aoAH0gNCAPyJxz4BlCFFxWNE1OPTgk5TthT+FvwqnKwRcOIfrRh3c/LTo6UDdyJwOOvEVPvLXCrrrUtdnniCEXAMPLE/IvU1dYUg2RVAJBanLiHb4IgRmpRV3zrkuWJOgQs8IZZaIv2BXIa2R4Olgk
 ```
 
-**List profiles:**
+### List existing Profiles
+Run the **list** command to view all existing profiles.
 ```
 $ aws-profile list
 foo
 ```
 
-**Select profile:**
+### Select an Active Profile
+Run the **use** command to set an existing profile as active. This changes the environment variables for the AWS CLI.
 ```
 $ aws-profile use foo
       Name                    Value             Type    Location
@@ -61,9 +82,10 @@ secret_key     ****************EKEY shared-credentials-file
     region               eu-central      config-file    ~/.aws/config
 ```
 
-**Show current profile:**
+### Show Current Active Profile
+Run the **show** command to display the currently active profile along with its configurations.
 ```
-$ aws-profile use foo
+$ aws-profile show
       Name                    Value             Type    Location
       ----                    -----             ----    --------
    profile                      foo              env    ['AWS_PROFILE', 'AWS_DEFAULT_PROFILE']
@@ -72,7 +94,8 @@ secret_key     ****************EKEY shared-credentials-file
     region               eu-central      config-file    ~/.aws/config
 ```
 
-**Update profile:**
+### Update an Existing Profile
+Run the **update** command to change the credentials and configurations of an existing profile.
 ```
 aws-profile update foo
 AWS ACCESS KEY ID [************MPLE]: 
@@ -82,7 +105,8 @@ Default output format [json]:
 AWS SESSION TOKEN [************Olgk]:
 ```
 
-**Export profile:**
+### Export a Profile
+Run the **export** command to export the profile's environment variables. The output can be in **sh** or **json** formats.
 ```
 $ aws-profile export --format sh
 export AWS_ACCESS_KEY_ID='AKIAIOSFODNN7EXAMPLE'
@@ -103,16 +127,28 @@ $ aws-profile export --format json
 }
 ```
 
-**Import profile:**
+### Import a Profile
+You can import a profile using a session token obtained from AWS STS.
 ```
 $ aws sts get-session-token > session.json
 $ aws-profile import foo session.json
 [ INFO] Successfully imported profile foo from session.json!
 ```
 
-**Remove profile:**
+### Remove a Profile
+Run the **remove** command to delete an existing profile. You will be prompted to confirm the deletion.
 ```
 $ aws-profile remove foo
 Are you sure you want to delete the profile 'foo'? (y/N) 
 [ INFO] Successfully removed profile foo!
 ```
+
+# Contributing
+
+Feel free to open an issue or submit a pull request. All contributions are welcome!
+
+# License
+
+This project is licensed under the GPLv3 License - see the LICENSE.md file for details.
+
+
