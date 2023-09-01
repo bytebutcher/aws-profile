@@ -12,10 +12,6 @@
 #	pip3 install awscli
 #	source install
 #
-# Quirks:
-#
-# 	The porition of the add- and update-function which is works with the AWS SESSION TOKEN 
-#	can not be tested correctly since 'aws configure' seems to eat all arguments 
 
 #
 # Helper functions
@@ -123,7 +119,8 @@ output = FORMAT"
 	actual_content=$(cat ~/.aws/credentials)
 	expected_aws_credentials="[default]
 aws_access_key_id = AWS_ACCESS_KEY_ID
-aws_secret_access_key = AWS_SECRET_ACCESS_KEY"
+aws_secret_access_key = AWS_SECRET_ACCESS_KEY
+aws_session_token = AWS_SESSION_TOKEN"
 	[ "$actual_content" == "$expected_aws_credentials" ]
 }
 
@@ -150,12 +147,15 @@ output = F3"
 	expected_content="[p1]
 aws_access_key_id = AAKI1
 aws_secret_access_key = ASAK1
+aws_session_token = S1
 [p2]
 aws_access_key_id = AAKI2
 aws_secret_access_key = ASAK2
+aws_session_token = S2
 [p3]
 aws_access_key_id = AAKI3
-aws_secret_access_key = ASAK3"
+aws_secret_access_key = ASAK3
+aws_session_token = S3"
 	[ "$actual_content" == "$expected_content" ]
 }
 
@@ -192,14 +192,21 @@ aws_secret_access_key = ASAK3"
 #
 
 @test "Test command usage: aws-profile export not existing profile" {
-	run aws-profile export not-existing
+	run aws-profile export --format bash not-existing
 	[ "${status}" -eq 1 ]
 	[[ "${lines[@]}" == *"does not exist!"* ]]
 }
 
+@test "Test command usage: aws-profile export invalid format" {
+	run_aws_profile_add default AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY REGION FORMAT AWS_SESSION_TOKEN
+	run aws-profile export --format invalid-format default
+	[ "${status}" -eq 1 ]
+	[[ "${lines[@]}" == *"Invalid format!"* ]]
+}
+
 @test "Test command usage: aws-profile export without profile selected" {
 	run_aws_profile_add default AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY REGION FORMAT AWS_SESSION_TOKEN
-	run aws-profile export
+	run aws-profile export --format bash
 	[ "${status}" -eq 1 ]
 	[[ "${lines[@]}" == *"No profile name specified!"* ]]
 }
@@ -207,29 +214,38 @@ aws_secret_access_key = ASAK3"
 @test "Test command usage: aws-profile export currently used profile" {
 	run_aws_profile_add p1 AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY REGION FORMAT AWS_SESSION_TOKEN
 	aws-profile use p1 &>/dev/null
-	actual_content=$(aws-profile export)
+	actual_content=$(aws-profile export --format bash)
 	expected_output="export AWS_ACCESS_KEY_ID='AWS_ACCESS_KEY_ID'
 export AWS_SECRET_ACCESS_KEY='AWS_SECRET_ACCESS_KEY'
 export AWS_DEFAULT_REGION='REGION'
-export AWS_DEFAULT_OUTPUT='FORMAT'"
-	# Bug: While the aws-profile add method works as expected
-	#      the run_aws_profile_add method does not add the session token.
-	#      As a consequence the aws-profile export function does not export the session token.
-	#export AWS_SESSION_TOKEN='AWS_SESSION_TOKEN'"
+export AWS_DEFAULT_OUTPUT='FORMAT'
+export AWS_SESSION_TOKEN='AWS_SESSION_TOKEN'"
 	[ "$actual_content" == "$expected_output" ]
 }
 
 @test "Test command usage: aws-profile export specified profile" {
 	run_aws_profile_add p1 AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY REGION FORMAT AWS_SESSION_TOKEN
-	actual_content=$(aws-profile export p1)
+	actual_content=$(aws-profile export --format bash p1)
 	expected_output="export AWS_ACCESS_KEY_ID='AWS_ACCESS_KEY_ID'
 export AWS_SECRET_ACCESS_KEY='AWS_SECRET_ACCESS_KEY'
 export AWS_DEFAULT_REGION='REGION'
-export AWS_DEFAULT_OUTPUT='FORMAT'"
-	# Bug: While the aws-profile add method works as expected
-	#      the run_aws_profile_add method does not add the session token.
-	#      As a consequence the aws-profile export function does not export the session token.
-	#export AWS_SESSION_TOKEN='AWS_SESSION_TOKEN'"
+export AWS_DEFAULT_OUTPUT='FORMAT'
+export AWS_SESSION_TOKEN='AWS_SESSION_TOKEN'"
+	[ "$actual_content" == "$expected_output" ]
+}
+
+@test "Test command usage: aws-profile export json" {
+	run_aws_profile_add p1 AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY REGION FORMAT AWS_SESSION_TOKEN
+	actual_content=$(aws-profile export --format json p1)
+	expected_output='{
+  "Credentials": {
+    "SessionToken": "AWS_SESSION_TOKEN",
+    "AccessKeyId": "AWS_SECRET_ACCESS_KEY",
+    "SecretAccessKey": "AWS_SECRET_ACCESS_KEY"
+  },
+  "Region": "REGION",
+  "Output": "FORMAT"
+}'
 	[ "$actual_content" == "$expected_output" ]
 }
 
@@ -256,25 +272,69 @@ export AWS_DEFAULT_OUTPUT='FORMAT'"
 	[[ "${lines[@]}" == *"does not exist!"* ]]
 }
 
+@test "Test command usage: aws-profile import abort when existing profile" {
+	run_aws_profile_add default AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY REGION FORMAT AWS_SESSION_TOKEN
+	credentials_file=/tmp/dummy.json
+	echo '{
+  "Credentials": {
+    "SessionToken": "AWS_SESSION_TOKEN",
+    "AccessKeyId": "AWS_ACCESS_KEY_ID",
+    "SecretAccessKey": "AWS_SECRET_ACCESS_KEY"
+  },
+  "Region": "REGION",
+  "Output": "FORMAT"
+}' > "${credentials_file}"
+	run aws-profile import default "${credentials_file}" < <(echo 'n')
+	[ "${status}" -eq 1 ]
+	[[ "${lines[@]}" == *"Aborted"* ]]
+}
+
 @test "Test command usage: aws-profile import existing profile" {
 	run_aws_profile_add default AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY REGION FORMAT AWS_SESSION_TOKEN
 	credentials_file=/tmp/dummy.json
-	run aws-profile import default "${credentials_file}"
-	[ "${status}" -eq 1 ]
-	[[ "${lines[@]}" == *"already exists!"* ]]
+	echo '{
+  "Credentials": {
+    "SessionToken": "SessionToken",
+    "AccessKeyId": "AccessKeyId",
+    "SecretAccessKey": "SecretAccessKey"
+  },
+  "Region": "Region",
+  "Output": "Output"
+}' > "${credentials_file}"
+	run aws-profile import default "${credentials_file}" < <(echo 'y')
+	# Test whether aws config file has correct content
+	expected_aws_config="[default]
+region = Region
+output = Output"
+	actual_content=$(cat ~/.aws/config)
+	[ "$actual_content" == "$expected_aws_config" ]
+
+	# Test whether aws credentials file has correct content
+	actual_content=$(cat ~/.aws/credentials)
+	expected_aws_credentials="[default]
+aws_access_key_id = AccessKeyId
+aws_secret_access_key = SecretAccessKey
+aws_session_token = SessionToken"
+	rm -f "${credentials_file}"
 }
 
 @test "Test command usage: aws-profile import" {
 	credentials_file=/tmp/aws-credentials.json
 	echo '{
-	  "AccessKeyId" : "ACCESS KEY ID",
-	  "SecretAccessKey" : "SECRET ACCESS KEY",
-	  "Token" : "AWS SESSION TOKEN"
-	}' >> "${credentials_file}"
+  "Credentials": {
+    "SessionToken": "AWS_SESSION_TOKEN",
+    "AccessKeyId": "AWS_ACCESS_KEY_ID",
+    "SecretAccessKey": "AWS_SECRET_ACCESS_KEY"
+  },
+  "Region": "REGION",
+  "Output": "FORMAT"
+}' > "${credentials_file}"
 	run aws-profile import default "${credentials_file}"
 
 	# Test whether aws config file has correct content
-	expected_aws_config="[default]"
+	expected_aws_config="[default]
+region = REGION
+output = FORMAT"
 	actual_content=$(cat ~/.aws/config)
 	[ "$actual_content" == "$expected_aws_config" ]
 
@@ -282,7 +342,8 @@ export AWS_DEFAULT_OUTPUT='FORMAT'"
 	actual_content=$(cat ~/.aws/credentials)
 	expected_aws_credentials="[default]
 aws_access_key_id = AWS_ACCESS_KEY_ID
-aws_secret_access_key = AWS_SECRET_ACCESS_KEY"
+aws_secret_access_key = AWS_SECRET_ACCESS_KEY
+aws_session_token = AWS_SESSION_TOKEN"
 	rm -f "${credentials_file}"
 }
 
@@ -354,9 +415,11 @@ output = F3"
 	expected_content="[p2]
 aws_access_key_id = AAKI2
 aws_secret_access_key = ASAK2
+aws_session_token = S2
 [p3]
 aws_access_key_id = AAKI3
-aws_secret_access_key = ASAK3"
+aws_secret_access_key = ASAK3
+aws_session_token = S3"
 	[ "$actual_content" == "$expected_content" ]
 }
 
@@ -390,9 +453,11 @@ output = F3"
 	expected_content="[p1]
 aws_access_key_id = AAKI1
 aws_secret_access_key = ASAK1
+aws_session_token = S1
 [p3]
 aws_access_key_id = AAKI3
-aws_secret_access_key = ASAK3"
+aws_secret_access_key = ASAK3
+aws_session_token = S3"
 	[ "$actual_content" == "$expected_content" ]
 }
 
@@ -420,9 +485,11 @@ output = F2"
 	expected_content="[p1]
 aws_access_key_id = AAKI1
 aws_secret_access_key = ASAK1
+aws_session_token = S1
 [p2]
 aws_access_key_id = AAKI2
-aws_secret_access_key = ASAK2"
+aws_secret_access_key = ASAK2
+aws_session_token = S2"
 	[ "$actual_content" == "$expected_content" ]
 }
 
@@ -494,12 +561,15 @@ output = 3d"
         expected_content="[p1]
 aws_access_key_id = 1a
 aws_secret_access_key = 1b
+aws_session_token = 1e
 [p2]
 aws_access_key_id = 2f
 aws_secret_access_key = 2g
+aws_session_token = 2j
 [p3]
 aws_access_key_id = 3a
-aws_secret_access_key = 3b"
+aws_secret_access_key = 3b
+aws_session_token = 3e"
         [ "$actual_content" == "$expected_content" ]
 }
 

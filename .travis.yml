@@ -1,0 +1,13 @@
+dist: jammy
+language: python
+python:
+  - "3.8"
+  - "3.9"
+  - "3.10"
+  - "3.11"
+install:
+  - apt install bats jq python3 python3-pip
+  - pip3 install git+https://github.com/aws/aws-cli.git@v2
+  - cat install | bash
+script:
+  - aws-profile test

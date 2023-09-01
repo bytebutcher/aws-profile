@@ -24,6 +24,7 @@ AWS_ENVIRONMENT_VARIABLES=(
 	"AWS_DEFAULT_FORMAT"
 	"AWS_SESSION_TOKEN"
 )
+STRING_MASK_MAX_LENGTH=16
 TOML_SECTION_REGEX='^\[[[:space:]A-Za-z0-9_-]+\]$'
 
 function usage() {
@@ -83,7 +84,31 @@ function do_require_file() {
 		print_error "The file '${file}' does not exist!"
 		exit 1
 	fi
-	echo "${file}"
+}
+
+function mask_string() {
+        local input_string="$@"
+        local length="${#input_string}"
+	local output_string=""
+
+        if [ -z "${input_string}" ] ; then
+		output_string="None"
+	else
+		if [[ ${length} -le 8 ]] ; then
+			output_string="****************"
+		else
+			if [[ ${length} -gt ${STRING_MASK_MAX_LENGTH} ]] ; then
+				length=${STRING_MASK_MAX_LENGTH}
+			fi
+
+			for (( i = 0; i < ${length} - 4; i++ )); do
+				output_string+="*"
+			done
+
+                	output_string+="${input_string: -4}"
+		fi
+        fi
+	echo "${output_string}"
 }
 
 function do_require_aws_config_file() {
@@ -152,9 +177,21 @@ function do_require_aws_profile_argument() {
 	fi
 }
 
+function jq_get_value() {
+        local file="${1}"
+        local key="${2}"
+        local value="$(cat "${file}" | jq -Mer "${key}")"
+        [[ "${value}" != "null" ]] && echo $value
+}
+
+function aws_profile_exists() {
+	local profile="${1}"
+	aws configure list-profiles | grep -e "^${profile}$" > /dev/null
+}
+
 function do_require_aws_profile_not_exists() {
 	local profile="${1}"
-	if aws configure list-profiles | grep -e "^${profile}$" > /dev/null; then 
+	if aws_profile_exists "${profile}"; then
 		print_error "The profile named '${profile}' already exists!"
 		exit 1
 	fi
@@ -162,7 +199,7 @@ function do_require_aws_profile_not_exists() {
 
 function do_require_aws_profile_exists() {
 	local profile="${1}"
-	if ! aws configure list-profiles | grep -e "^${profile}$" > /dev/null; then 
+	if ! aws_profile_exists "${profile}"; then
 		print_error "The profile named '${profile}' does not exist!"
 		exit 1
 	fi
@@ -176,6 +213,29 @@ function aws_get_profile() {
 		profile="${AWS_PROFILE}"
 	fi
 	echo "${profile}"
+}
+
+function aws_add_profile() {
+	read -p "AWS ACCESS KEY ID [None]: " aws_access_key_id
+	read -p "AWS SECRET ACCESS KEY [None]: " aws_secret_access_key
+	read -p "Default region name [None]: " aws_region
+	read -p "Default output format [None]: " aws_output_format
+	read -p "AWS SESSION TOKEN [None]: " aws_session_token
+	if [ -n "${aws_access_key_id}" ] ; then
+		aws configure --profile "${profile}" set aws_access_key_id "${aws_access_key_id}"
+	fi
+	if [ -n "${aws_secret_access_key}" ] ; then
+		aws configure --profile "${profile}" set aws_secret_access_key "${aws_secret_access_key}"
+	fi
+	if [ -n "${aws_region}" ] ; then
+		aws configure --profile "${profile}" set region "${aws_region}"
+	fi
+	if [ -n "${aws_output_format}" ] ; then
+		aws configure --profile "${profile}" set output "${aws_output_format}"
+	fi
+	if [ -n "${aws_session_token}" ] ; then
+		aws configure --profile "${profile}" set aws_session_token "${aws_session_token}"
+	fi
 }
 
 function aws_delete_profile() {
@@ -197,8 +257,8 @@ function aws_delete_profile() {
 	print_info "Successfully removed profile ${profile}!"
 }
 
-function aws_export_profile() {
-	local profile="${1}"
+function aws_export_profile_json() {
+	local profile="$1"
 	local aws_config_file="$(do_require_aws_config_file)"
 	local aws_credentials_file="$(do_require_aws_credentials_file)"
 	aws_access_key_id=$(get_toml_section_value "${profile}" "aws_access_key_id" "${aws_credentials_file}")
@@ -207,8 +267,56 @@ function aws_export_profile() {
 	aws_session_token=$(get_toml_section_value "${profile}" "aws_session_token" "${aws_credentials_file}")
 	aws_region=$(get_toml_section_value "profile ${profile}" "region" "${aws_config_file}")
 	aws_output=$(get_toml_section_value "profile ${profile}" "output" "${aws_config_file}")
-	echo "export AWS_ACCESS_KEY_ID='${aws_access_key_id}'"
-	echo "export AWS_SECRET_ACCESS_KEY='${aws_secret_access_key}'"
+
+	result=""
+	if [ -n "${aws_access_key_id}" ] || [ -n "${aws_secret_access_key}" ] || [ -n "${aws_session_token}" ] ; then
+		declare -A credentials
+		if [ -n "${aws_secret_access_key}" ] ; then
+			credentials["AccessKeyId"]="${aws_secret_access_key}"
+		fi
+		if [ -n "${aws_secret_access_key}" ] ; then
+			credentials["SecretAccessKey"]="${aws_secret_access_key}"
+		fi
+		if [ -n "${aws_session_token}" ] ; then
+			credentials["SessionToken"]="${aws_session_token}"
+		fi
+		for key in "${!credentials[@]}"; do
+			result+="\"$key\": \"${credentials[$key]}\","
+		done
+		result="\"Credentials\": { ${result%,} }"
+	fi
+	if [ -n "${aws_output}" ] || [ -n "${aws_region}" ] ; then
+		if [ -n "${result}" ] ; then
+			result+=","
+		fi
+		if [ -n "${aws_region}" ] ; then
+			result+="\"Region\": \"${aws_region}\","
+		fi
+		if [ -n "${aws_output}" ] ; then
+			result+="\"Output\": \"${aws_output}\","
+		fi
+		result="${result%,}"
+	fi
+	echo "{ ${result} }" | jq -M
+}
+
+function aws_export_profile_sh() {
+	local profile="$1"
+	local aws_config_file="$(do_require_aws_config_file)"
+	local aws_credentials_file="$(do_require_aws_credentials_file)"
+	aws_access_key_id=$(get_toml_section_value "${profile}" "aws_access_key_id" "${aws_credentials_file}")
+
+	aws_secret_access_key=$(get_toml_section_value "${profile}" "aws_secret_access_key" "${aws_credentials_file}")
+	aws_session_token=$(get_toml_section_value "${profile}" "aws_session_token" "${aws_credentials_file}")
+	aws_region=$(get_toml_section_value "profile ${profile}" "region" "${aws_config_file}")
+	aws_output=$(get_toml_section_value "profile ${profile}" "output" "${aws_config_file}")
+
+	if [ -n "${aws_access_key_id}" ] ; then
+		echo "export AWS_ACCESS_KEY_ID='${aws_access_key_id}'"
+	fi
+	if [ -n "${aws_secret_access_key}" ] ; then
+		echo "export AWS_SECRET_ACCESS_KEY='${aws_secret_access_key}'"
+	fi
 	if [ -n "${aws_region}" ] ; then
 		echo "export AWS_DEFAULT_REGION='${aws_region}'"
 	fi
@@ -220,27 +328,57 @@ function aws_export_profile() {
 	fi
 }
 
+function aws_export_profile() {
+	local profile="${1}"
+	local format="${2}"
+	if [[ "${format}" == "bash" || "${format}" == "sh" ]] ; then
+		aws_export_profile_sh "${profile}"
+	elif [[ "${format}" == "json" ]] ; then
+		aws_export_profile_json "${profile}"
+	else
+		print_error "Invalid format! Supported formats: json, sh, bash"
+		return 1
+	fi
+	return 0
+}
+
 function aws_import_profile() {
 	# Make sure that jq is installed for being able to parse the json file
 	do_require_command "jq"
 
 	local profile="${1}"
-	do_require_aws_profile_not_exists "${1}"
-	local aws_config_file="$(do_require_aws_config_file)"
-	local aws_credentials_file="$(do_require_aws_credentials_file)"
+	if aws_profile_exists "${profile}"; then
+		read -p "The profile '${profile}' already exists! Do you want to update the profile? (y/N) " -n 1 -r -s
+		echo >&2
+		if [[ ! $REPLY =~ ^[Yy]$ ]] ; then
+			echo "Aborted." >&2
+			return 1
+		fi
+	fi
 
 	local credentials_json="${2}"
-	local aws_access_key=$(cat $credentials_json | jq -r .AccessKeyId)
-	local aws_secret_access_key=$(cat $credentials_json | jq -r .SecretAccessKey)
-	local aws_session_token=$(cat $credentials_json | jq -r .Token)
-	echo "[${profile}]" >> "${aws_config_file}"
-	cat <<EOL >> "${aws_credentials_file}"
-[${profile}]
-aws_access_key_id = $aws_access_key
-aws_secret_access_key = $aws_secret_access_key
-aws_session_token = $aws_session_token
-EOL
-	print_info "Successfully imported profile ${profile} from ${file}!"
+	local aws_access_key_id="$(cat $credentials_json | jq_get_value ${credentials_json} .Credentials.AccessKeyId)"
+	local aws_secret_access_key="$(cat $credentials_json | jq_get_value ${credentials_json} .Credentials.SecretAccessKey)"
+	local aws_session_token="$(cat $credentials_json | jq_get_value ${credentials_json} .Credentials.SessionToken)"
+	local aws_region="$(cat $credentials_json | jq_get_value ${credentials_json} .Region)"
+	local aws_output_format="$(cat $credentials_json | jq_get_value ${credentials_json} .Output)"
+
+	if [ -n "${aws_access_key_id}" ] ; then
+		aws configure --profile "${profile}" set aws_access_key_id "${aws_access_key_id}"
+	fi
+	if [ -n "${aws_secret_access_key}" ] ; then
+		aws configure --profile "${profile}" set aws_secret_access_key "${aws_secret_access_key}"
+	fi
+	if [ -n "${aws_region}" ] ; then
+		aws configure --profile "${profile}" set region "${aws_region}"
+	fi
+	if [ -n "${aws_output_format}" ] ; then
+		aws configure --profile "${profile}" set output "${aws_output_format}"
+	fi
+	if [ -n "${aws_session_token}" ] ; then
+		aws configure --profile "${profile}" set aws_session_token "${aws_session_token}"
+	fi
+	aws configure list --profile "${profile}"
 }
 
 function aws_use_profile() {
@@ -259,18 +397,31 @@ function aws_use_profile() {
 
 function aws_update_profile() {
 	local profile="${1}"
-	if aws configure --profile "${profile}" ; then
-		local aws_credentials_file="$(do_require_aws_credentials_file)"
-		local aws_session_token=$(get_toml_section_value "${profile}" "aws_session_token" "${aws_credentials_file}")
-		if [ -n "${aws_session_token}" ] ; then
-			read -p "AWS Session Token [*****************]: " AWS_SESSION_TOKEN
-			if [ -n "${AWS_SESSION_TOKEN}" ] ; then
-				aws_session_token="${AWS_SESSION_TOKEN}"
-			fi
-		fi
-		if [ -n "${aws_session_token}" ] ; then
-			aws configure --profile "${profile}" set aws_session_token "${aws_session_token}"
-		fi
+
+	default_value="$(mask_string "$(aws configure --profile "${profile}" get aws_access_key_id)")"
+	read -p "AWS ACCESS KEY ID [$default_value]: " aws_access_key_id
+	default_value="$(mask_string "$(aws configure --profile "${profile}" get aws_secret_access_key)")"
+	read -p "AWS SECRET ACCESS KEY [$default_value]: " aws_secret_access_key
+	default_value="$(aws configure --profile "${profile}" get region)"
+	read -p "Default region name [$default_value]: " aws_region
+	default_value="$(aws configure --profile "${profile}" get output)"
+	read -p "Default output format [$default_value]: " aws_output_format
+	default_value=$(mask_string "$(aws configure --profile "${profile}" get aws_session_token)")
+	read -p "AWS SESSION TOKEN [$default_value]: " aws_session_token
+	if [ -n "${aws_access_key_id}" ] ; then
+		aws configure --profile "${profile}" set aws_access_key_id "${aws_access_key_id}"
+	fi
+	if [ -n "${aws_secret_access_key}" ] ; then
+		aws configure --profile "${profile}" set aws_secret_access_key "${aws_secret_access_key}"
+	fi
+	if [ -n "${aws_region}" ] ; then
+		aws configure --profile "${profile}" set region "${aws_region}"
+	fi
+	if [ -n "${aws_output_format}" ] ; then
+		aws configure --profile "${profile}" set output "${aws_output_format}"
+	fi
+	if [ -n "${aws_session_token}" ] ; then
+		aws configure --profile "${profile}" set aws_session_token "${aws_session_token}"
 	fi
 }
 
@@ -301,17 +452,10 @@ while [ "$1" != "" ]; do
                                 exit 1
                         fi
 			do_require_aws_profile_not_exists "${profile}"
-			# Add aws profile.
-			if aws configure --profile "${profile}" ; then
-				read -p "AWS Session Token [None]: " AWS_SESSION_TOKEN
-				if [ -n "${AWS_SESSION_TOKEN}" ] ; then
-					aws configure --profile "${profile}" set aws_session_token "${AWS_SESSION_TOKEN}"
-				fi
-			fi
+			aws_add_profile "${profile}"
 			exit
 			;;
 		list | ls )		   
-			# List aws profiles.
 			aws configure list-profiles
 			exit 0
 			;;
@@ -324,18 +468,21 @@ while [ "$1" != "" ]; do
                         fi
 			do_require_aws_profile_argument "${profile}"
 			do_require_aws_profile_exists "${profile}"
-			# Use aws profile. 
 			aws_use_profile "${profile}"
 			exit 0
 			;;
 		export )
 			shift
-			profile="$(aws_get_profile "${1}")"
+			profile="$(aws_get_profile "$3")"
+			format="$2"
+			if [[ "$1" != "--format" ]] ; then
+				echo "Usage: aws-profile export --format <bash|json|sh> [profile name]" >&2
+				exit 1
+			fi
 			do_require_aws_profile_argument "${profile}"
 			do_require_aws_profile_exists "${profile}"
-			# Export aws profile.
-			aws_export_profile "${profile}"
-			exit 0
+			aws_export_profile "${profile}" "${format}"
+			exit $?
 			;;
 		import )
 			shift
@@ -345,10 +492,9 @@ while [ "$1" != "" ]; do
 				echo "Usage: aws-profile import <profile-name> <json-file>" >&2
 				exit 1
 			fi
-			do_require_aws_profile_not_exists "${profile}"
 			do_require_file "${file}"
 			aws_import_profile "${profile}" "${file}"
-			exit 0
+			exit $?
 			;;
 		delete | remove | rm )
 			shift
@@ -363,7 +509,6 @@ while [ "$1" != "" ]; do
 			profile="$(aws_get_profile "${1}")"
 			do_require_aws_profile_argument "${profile}"
 			do_require_aws_profile_exists "${profile}"
-			# Update aws profile.
 			aws_update_profile "${profile}"
 			exit 0
 			;;
